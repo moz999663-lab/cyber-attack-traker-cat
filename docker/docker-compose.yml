@@ -2,23 +2,30 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: cat
-      POSTGRES_USER: cat
-      POSTGRES_PASSWORD: cat_dev_only
+      POSTGRES_DB: ${POSTGRES_DB:-cat}
+      POSTGRES_USER: ${POSTGRES_USER:-cat}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cat_dev_only}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - cat-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cat} -d ${POSTGRES_DB:-cat}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   backend:
     build:
       context: ../backend
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://cat:cat_dev_only@postgres:5432/cat
+      DATABASE_URL: postgresql://${POSTGRES_USER:-cat}:${POSTGRES_PASSWORD:-cat_dev_only}@postgres:5432/${POSTGRES_DB:-cat}
+      CAT_API_KEY: ${CAT_API_KEY:-}
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
 
 volumes:
   cat-postgres:
