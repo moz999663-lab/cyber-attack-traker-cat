@@ -2,7 +2,7 @@ import os
 from datetime import timezone
 from uuid import UUID
 
-from sqlalchemy import Column, DateTime, MetaData, String, Table, create_engine, select
+from sqlalchemy import Column, DateTime, MetaData, String, Table, create_engine, func, select
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.types import JSON
 
@@ -27,26 +27,32 @@ def database_url() -> str:
 
 class EventStore:
     def __init__(self, url: str | None = None):
-        self.engine = create_engine(url or database_url(), future=True)
+        resolved_url = url or database_url()
+        connect_args = {"check_same_thread": False} if resolved_url.startswith("sqlite") else {}
+        self.engine = create_engine(resolved_url, future=True, connect_args=connect_args)
         metadata.create_all(self.engine)
 
     def add(self, event: SecurityEvent) -> None:
         payload = event.model_dump(mode="json")
         with self.engine.begin() as connection:
-            connection.execute(events_table.insert().values(
-                event_id=str(event.event_id),
-                host_id=event.host_id,
-                event_type=event.event_type.value,
-                timestamp=event.timestamp.astimezone(timezone.utc),
-                payload=payload,
-            ))
+            connection.execute(
+                events_table.insert().values(
+                    event_id=str(event.event_id),
+                    host_id=event.host_id,
+                    event_type=event.event_type.value,
+                    timestamp=event.timestamp.astimezone(timezone.utc),
+                    payload=payload,
+                )
+            )
 
     def exists(self, event_id: UUID) -> bool:
         with self.engine.connect() as connection:
             return connection.execute(
-                select(events_table.c.event_id).where(events_table.c.event_id == str(event_id)).limit(1)
+                select(events_table.c.event_id)
+                .where(events_table.c.event_id == str(event_id))
+                .limit(1)
             ).first() is not None
 
     def count(self) -> int:
         with self.engine.connect() as connection:
-            return len(connection.execute(select(events_table.c.event_id)).all())
+            return int(connection.execute(select(func.count()).select_from(events_table)).scalar_one())
