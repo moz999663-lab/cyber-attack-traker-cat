@@ -1,9 +1,8 @@
-import json
 import os
-from datetime import datetime, timezone
+from datetime import timezone
 from uuid import UUID
 
-from sqlalchemy import DateTime, MetaData, String, Table, create_engine, select
+from sqlalchemy import Column, DateTime, MetaData, String, Table, create_engine, select
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.types import JSON
 
@@ -14,12 +13,11 @@ metadata = MetaData()
 events_table = Table(
     "security_events",
     metadata,
-    # String keeps the UUID portable across SQLite and PostgreSQL.
-    __import__("sqlalchemy").Column("event_id", String(36), primary_key=True),
-    __import__("sqlalchemy").Column("host_id", String(128), nullable=False, index=True),
-    __import__("sqlalchemy").Column("event_type", String(32), nullable=False),
-    __import__("sqlalchemy").Column("timestamp", DateTime(timezone=True), nullable=False, index=True),
-    __import__("sqlalchemy").Column("payload", JSON().with_variant(JSONB, "postgresql"), nullable=False),
+    Column("event_id", String(36), primary_key=True),
+    Column("host_id", String(128), nullable=False, index=True),
+    Column("event_type", String(32), nullable=False),
+    Column("timestamp", DateTime(timezone=True), nullable=False, index=True),
+    Column("payload", JSON().with_variant(JSONB, "postgresql"), nullable=False),
 )
 
 
