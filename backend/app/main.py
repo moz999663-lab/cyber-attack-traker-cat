@@ -1,4 +1,5 @@
 from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from .models import SecurityEvent
 from .detection import run_detectors
@@ -18,10 +19,12 @@ class AnalysisRequest(BaseModel):
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
     content_length = request.headers.get("content-length")
-    if content_length and int(content_length) > MAX_REQUEST_BYTES:
-        return __import__("fastapi").responses.JSONResponse(
-            status_code=413, content={"detail": "request too large"}
-        )
+    if content_length:
+        try:
+            if int(content_length) > MAX_REQUEST_BYTES:
+                return JSONResponse(status_code=413, content={"detail": "request too large"})
+        except ValueError:
+            return JSONResponse(status_code=400, content={"detail": "invalid content-length"})
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
