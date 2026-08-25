@@ -1,2 +1,40 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CAT Dashboard</title><style>body{font-family:system-ui;margin:2rem;max-width:1100px}button{padding:.7rem 1rem}pre{white-space:pre-wrap;background:#f5f5f5;padding:1rem;border-radius:8px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem}.card{border:1px solid #ddd;padding:1rem;border-radius:8px}</style></head><body><h1>Cyber Attack Tracker</h1><p>Defensive incident investigation dashboard.</p><button id="demo">Run synthetic demo</button><div id="summary" class="grid"></div><h2>Incident evidence</h2><pre id="out">No analysis yet.</pre><script>document.getElementById('demo').onclick=async()=>{const r=await fetch('/api/v1/demo',{method:'POST'});const d=await r.json();const i=d.incidents[0];document.getElementById('summary').innerHTML=i?[`<div class="card"><b>Risk</b><br>${i.risk.score} / 100</div>`,`<div class="card"><b>Level</b><br>${i.risk.level}</div>`,`<div class="card"><b>Detections</b><br>${i.detections.length}</div>`,`<div class="card"><b>Graph nodes</b><br>${i.attack_graph.nodes.length}</div>`].join(''): '<div class="card">No incidents</div>';document.getElementById('out').textContent=JSON.stringify(d,null,2)}</script></body></html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>CAT — Cyber Attack Tracker</title>
+  <style>
+    :root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#e8eef7;background:#0b1220}
+    body{margin:0;padding:2rem;max-width:1200px;margin-inline:auto}
+    .toolbar,.grid{display:grid;gap:1rem}.toolbar{grid-template-columns:1fr auto auto;align-items:end}.grid{grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin:1rem 0}
+    .card{background:#121c2d;border:1px solid #263550;border-radius:12px;padding:1rem}.muted{color:#9fb0c7}.danger{color:#ffb4ab}.ok{color:#9ce7b0}
+    input,button{font:inherit;border-radius:8px;padding:.7rem}.input{display:flex;flex-direction:column;gap:.35rem}input{background:#0d1728;color:inherit;border:1px solid #334563}button{cursor:pointer;border:0;background:#d7e4f7;color:#101827;font-weight:700}
+    pre{white-space:pre-wrap;overflow:auto;background:#0d1728;padding:1rem;border-radius:10px;border:1px solid #263550;max-height:520px}
+    table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:.55rem;border-bottom:1px solid #263550}.pill{padding:.2rem .5rem;border-radius:999px;background:#253552}
+  </style>
+</head>
+<body>
+  <h1>Cyber Attack Tracker</h1>
+  <p class="muted">Defensive incident investigation dashboard. Synthetic telemetry only.</p>
+  <section class="toolbar">
+    <label class="input">API key <input id="key" type="password" autocomplete="off" placeholder="Required when CAT_API_KEY is enabled"></label>
+    <button id="health">Health</button><button id="demo">Run synthetic analysis</button>
+  </section>
+  <div id="summary" class="grid"></div>
+  <section class="card"><h2>Incident timeline</h2><div id="timeline" class="muted">No analysis yet.</div></section>
+  <section class="card"><h2>Detections</h2><div id="detections" class="muted">No analysis yet.</div></section>
+  <section class="card"><h2>Evidence / API response</h2><pre id="out">No analysis yet.</pre></section>
+<script>
+const key=()=>document.getElementById('key').value.trim();
+async function api(path){const headers={};if(key())headers['X-API-Key']=key();const r=await fetch(path,{method:'POST',headers});let d={};try{d=await r.json()}catch{}if(!r.ok)throw new Error(d.detail||`HTTP ${r.status}`);return d}
+function card(label,value){return `<div class="card"><span class="muted">${label}</span><br><strong>${value}</strong></div>`}
+function render(d){const i=d.incidents?.[0];document.getElementById('summary').innerHTML=i?[card('Risk',`${i.risk.score} / 100`),card('Level',i.risk.level),card('Detections',i.detections.length),card('Graph nodes',i.attack_graph.nodes.length)]:card('Status','No incidents');
+ document.getElementById('timeline').innerHTML=i?.attack_graph?.timeline?.length?'<ol>'+i.attack_graph.timeline.map(x=>`<li><span class="pill">${x.event_type||'event'}</span> ${x.description||JSON.stringify(x)}</li>`).join('')+'</ol>':'No timeline available';
+ document.getElementById('detections').innerHTML=i?.detections?.length?'<table><tr><th>Rule</th><th>Severity</th><th>Confidence</th><th>Explanation</th></tr>'+i.detections.map(x=>`<tr><td>${x.rule_id}</td><td>${x.severity}</td><td>${Math.round(x.confidence*100)}%</td><td>${x.explanation}</td></tr>`).join('')+'</table>':'No detections';
+ document.getElementById('out').textContent=JSON.stringify(d,null,2)}
+document.getElementById('demo').onclick=async()=>{try{render(await api('/api/v1/demo'))}catch(e){document.getElementById('out').textContent=e.message}};
+document.getElementById('health').onclick=async()=>{try{const r=await fetch('/health');document.getElementById('out').textContent=JSON.stringify(await r.json(),null,2)}catch(e){document.getElementById('out').textContent=e.message}};
+</script>
+</body></html>
