@@ -1,6 +1,7 @@
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+
 from .models import SecurityEvent
 from .detection import run_detectors
 from .correlation import Correlator
@@ -8,9 +9,11 @@ from .tracer import AttackTracer
 from .risk import assess
 from .simulator import sample_events
 from .security import require_api_key
+from .storage import EventStore
 
-app = FastAPI(title="Cyber Attack Tracker", version="0.2.0")
+app = FastAPI(title="Cyber Attack Tracker", version="0.3.0")
 EVENTS: list[SecurityEvent] = []
+STORE = EventStore()
 MAX_REQUEST_BYTES = 1_000_000
 
 class AnalysisRequest(BaseModel):
@@ -34,14 +37,27 @@ async def security_headers(request: Request, call_next):
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "cat-backend", "version": "0.2.0"}
+    try:
+        stored = STORE.count()
+        database = "ok"
+    except Exception:
+        stored = None
+        database = "error"
+    return {
+        "status": "ok" if database == "ok" else "degraded",
+        "service": "cat-backend",
+        "version": "0.3.0",
+        "database": database,
+        "stored_events": stored,
+    }
 
 @app.post("/api/v1/events", dependencies=[Depends(require_api_key)])
 def ingest(event: SecurityEvent):
-    if any(x.event_id == event.event_id for x in EVENTS):
+    if STORE.exists(event.event_id):
         raise HTTPException(status_code=409, detail="duplicate event_id")
-    if len(EVENTS) >= 10000:
+    if STORE.count() >= 10000:
         raise HTTPException(status_code=429, detail="event buffer limit reached")
+    STORE.add(event)
     EVENTS.append(event)
     return {"accepted": True, "event_id": str(event.event_id)}
 
